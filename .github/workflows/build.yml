@@ -1,15 +1,16 @@
-name: Build Thorium Browser
+name: Build Thorium Multi-OS
 
 on:
   push:
     branches: [ main ]
-  workflow_dispatch: # Pour le lancer à la main
+  workflow_dispatch:
 
 jobs:
   build:
     name: Build on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false # Pour ne pas tout stopper si un OS fail
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
 
@@ -17,41 +18,57 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      # 1. Setup des outils spécifiques (Exemple pour Chromium/Thorium)
-      - name: Install Dependencies (Linux)
+      # --- SETUP DEPOT TOOLS (Fix du dossier existant inclus) ---
+      - name: Setup Depot Tools
+        shell: bash
+        run: |
+          if [ -d "depot_tools" ]; then
+            echo "Nettoyage de l'ancien depot_tools..."
+            rm -rf depot_tools
+          fi
+          git clone --depth 1 https://chromium.googlesource.com/chromium/tools/depot_tools.git
+          echo "$GITHUB_WORKSPACE/depot_tools" >> $GITHUB_PATH
+
+      # --- INSTALLATION DES DÉPENDANCES ---
+      - name: Install System Dependencies (Linux)
         if: matrix.os == 'ubuntu-latest'
         run: |
           sudo apt-get update
-          sudo apt-get install -y python3 git curl build-essential
+          sudo apt-get install -y python3 git curl build-essential lsb-release
 
-      - name: Install Depot Tools
+      - name: Install System Dependencies (Windows)
+        if: matrix.os == 'windows-latest'
         run: |
-          git clone https://chromium.googlesource.com/chromium/tools/depot_tools.git
-          echo "$GITHUB_WORKSPACE/depot_tools" >> $GITHUB_PATH
+          # Windows a déjà la plupart des outils, mais Chromium a besoin de Python
+          choco install python --version=3.11 -y
 
-      # 2. Récupération des sources (C'est l'étape qui peut Timeout ⚠️)
-      - name: Fetch Thorium/Chromium Source
+      # --- SYNC & BUILD (C'est là que la magie/douleur opère) ---
+      - name: Fetch & Sync Thorium
+        shell: bash
         run: |
-          # Ici normalement tu fais un 'fetch' ou tu télécharges un tarball
-          echo "Fetching source for ${{ matrix.os }}..."
+          echo "Initialisation du build pour ${{ matrix.os }}..."
+          # Ici tu devrais normalement faire un 'gclient config' et 'gclient sync'
+          # Attention : C'est l'étape la plus longue et lourde.
+          echo "Syncing source code..."
 
-      # 3. Le Build (Configuré pour Thorium)
-      - name: Compile Browser
+      - name: Compile Thorium
+        shell: bash
         run: |
-          # Remplace par les vraies commandes de compilation de Thorium
-          # ex: gn gen out/Default && ninja -C out/Default chrome
-          echo "Compiling on ${{ matrix.os }}..."
+          echo "Début de la compilation..."
+          # Commandes spécifiques Thorium (gn gen / ninja)
+          # Exemple : ./thorium/build.sh
+          echo "Build en cours..."
 
-      # 4. Packaging des fichiers (Zip/DMG/EXE)
-      - name: Create Release Package
+      # --- PACKAGING & UPLOAD ---
+      - name: Package Artifacts
+        shell: bash
         run: |
-          mkdir build-output
-          # Commandes pour zipper ou packager selon l'OS
-          echo "Packaging..." > build-output/release-info.txt
+          mkdir -p output
+          echo "Build terminé le $(date)" > output/build_info.txt
+          # Ici, tu copies tes binaires (.exe, .dmg, .deb) dans le dossier output
 
-      # 5. Upload sur GitHub pour que tu puisses les télécharger
-      - name: Upload Artifacts
+      - name: Upload Build
         uses: actions/upload-artifact@v4
         with:
-          name: thorium-${{ matrix.os }}
-          path: build-output/
+          name: Thorium-Build-${{ matrix.os }}
+          path: output/
