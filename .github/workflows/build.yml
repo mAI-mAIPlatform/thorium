@@ -1,0 +1,57 @@
+name: Build Thorium Browser
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch: # Pour le lancer à la main
+
+jobs:
+  build:
+    name: Build on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # 1. Setup des outils spécifiques (Exemple pour Chromium/Thorium)
+      - name: Install Dependencies (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3 git curl build-essential
+
+      - name: Install Depot Tools
+        run: |
+          git clone https://chromium.googlesource.com/chromium/tools/depot_tools.git
+          echo "$GITHUB_WORKSPACE/depot_tools" >> $GITHUB_PATH
+
+      # 2. Récupération des sources (C'est l'étape qui peut Timeout ⚠️)
+      - name: Fetch Thorium/Chromium Source
+        run: |
+          # Ici normalement tu fais un 'fetch' ou tu télécharges un tarball
+          echo "Fetching source for ${{ matrix.os }}..."
+
+      # 3. Le Build (Configuré pour Thorium)
+      - name: Compile Browser
+        run: |
+          # Remplace par les vraies commandes de compilation de Thorium
+          # ex: gn gen out/Default && ninja -C out/Default chrome
+          echo "Compiling on ${{ matrix.os }}..."
+
+      # 4. Packaging des fichiers (Zip/DMG/EXE)
+      - name: Create Release Package
+        run: |
+          mkdir build-output
+          # Commandes pour zipper ou packager selon l'OS
+          echo "Packaging..." > build-output/release-info.txt
+
+      # 5. Upload sur GitHub pour que tu puisses les télécharger
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: thorium-${{ matrix.os }}
+          path: build-output/
