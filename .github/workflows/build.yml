@@ -10,7 +10,7 @@ jobs:
     name: Build on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
-      fail-fast: false # Pour ne pas tout stopper si un OS fail
+      fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
 
@@ -18,12 +18,17 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      # --- SETUP DEPOT TOOLS (Fix du dossier existant inclus) ---
+      # --- LE FIX POUR PYTHON (Tous les OS) ---
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      # --- SETUP DEPOT TOOLS (Nettoyage auto inclus) ---
       - name: Setup Depot Tools
         shell: bash
         run: |
           if [ -d "depot_tools" ]; then
-            echo "Nettoyage de l'ancien depot_tools..."
             rm -rf depot_tools
           fi
           git clone --depth 1 https://chromium.googlesource.com/chromium/tools/depot_tools.git
@@ -39,24 +44,23 @@ jobs:
       - name: Install System Dependencies (Windows)
         if: matrix.os == 'windows-latest'
         run: |
-          # Windows a déjà la plupart des outils, mais Chromium a besoin de Python
-          choco install python --version=3.11 -y
+          # On ne réinstalle pas Python ici ! 
+          # Les runners Windows ont déjà Git et VS Build Tools.
+          echo "Windows environment ready"
 
-      # --- SYNC & BUILD (C'est là que la magie/douleur opère) ---
+      # --- SYNC & BUILD ---
       - name: Fetch & Sync Thorium
         shell: bash
         run: |
           echo "Initialisation du build pour ${{ matrix.os }}..."
-          # Ici tu devrais normalement faire un 'gclient config' et 'gclient sync'
-          # Attention : C'est l'étape la plus longue et lourde.
+          # gclient sync ...
           echo "Syncing source code..."
 
       - name: Compile Thorium
         shell: bash
         run: |
           echo "Début de la compilation..."
-          # Commandes spécifiques Thorium (gn gen / ninja)
-          # Exemple : ./thorium/build.sh
+          # ./thorium/build.sh
           echo "Build en cours..."
 
       # --- PACKAGING & UPLOAD ---
@@ -64,8 +68,7 @@ jobs:
         shell: bash
         run: |
           mkdir -p output
-          echo "Build terminé le $(date)" > output/build_info.txt
-          # Ici, tu copies tes binaires (.exe, .dmg, .deb) dans le dossier output
+          echo "Build finished on ${{ matrix.os }}" > output/status.txt
 
       - name: Upload Build
         uses: actions/upload-artifact@v4
